@@ -84,3 +84,25 @@
 - Latency click->recoil on screen ~0.4 s (HL2 ~20 fps in background, bridge poll ~100 ms). NEXT: cut latency
   (HL2 background fps, App Nap), viewmodel sway from MC mouse look, crowbar swing timing, HL2 HUD icons, more
   weapons (SMG1, shotgun, .357 exist in the demo? check weapon scripts), showcase clip.
+
+## 2026-10-05 night: all weapons, F9 wave, full res, showcase
+- Demo weapons that load: crowbar, pistol, smg1, shotgun, 357, frag, physcannon. rpg/ar2/crossbow/bugbait/
+  alyxgun: "Error reading weapon data file" + no viewmodel. sv_infinite_ammo 1 works in the demo.
+- After a frag throw HL2 auto-switches weapons even with infinite ammo -> re-send "use weapon_frag" ~1.2 s later.
+- F9 reset: MC side = time set day (vanilla command as server source), heal/feed, give missing kit, discard old
+  wave + Enemy within 48 blocks, 15 zombies in a ring 14-24 blocks (leather cap = no sunlight burning).
+  HL2 side = hc_arm + map d1_town_01, poll getpos until "setpos" is NOT 0/0/0 (getpos prints zeros while
+  loading), then hc_stage + use <held weapon>. A startup "map" in hl2craft.cfg loses to the menu background map.
+- Respawn keeps the entity id but creates a new LocalPlayer: compare the object to re-give the kit.
+- Full res: HL2 -w 1728 -h 972, hl2capture follows the window 1:1, only grows the shared file (shrinking a file
+  Minecraft has mapped would SIGBUS it), skips SCFrameStatus != complete frames.
+- Latency (trace with ~/.hl2craft-trace): MC input -> bridge file 3 ms; file -> first changed HL2 frame ~110 ms.
+  HL2 ~30 new full-res frames/s behind Minecraft.
+- macOS driving: synthetic keys need the game window clicked first; chat typing via synthetic events was
+  unreliable (dropped chars) -> test through keybinds (F9) instead of chat commands.
+- Recording: SCRecordingOutput needs NSApplication.run() (status item on main thread). A window-only filter
+  records only that app's audio -> display filter with Minecraft + Wine apps, sourceRect = MC window.
+  ffmpeg via `uv run --with imageio-ffmpeg`. ~/.hl2craft-showcase gives a 2-min Resistance/Regeneration buff on
+  F9 for scripted takes (scripted aim loses to 15 zombies otherwise).
+- Social clips: media/hl2craft_16x9.mp4, media/hl2craft_9x16.mp4 (34 s from take3 0:18-0:52).
+- Minecraft was closed (normal "Stopping!") twice at 19:17 and 20:11 while I was working, not by me.

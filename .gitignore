@@ -46,3 +46,6 @@ tools/mac/key
 tools/mac/activate
 tools/mac/type
 tools/mac/wins
+tools/mac/record
+media/
+tools/mac/hold2

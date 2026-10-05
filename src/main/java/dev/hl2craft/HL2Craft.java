@@ -17,14 +17,17 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -120,7 +123,7 @@ public class HL2Craft implements ModInitializer {
         }
     }
 
-    /** F9: back to the start. Full health and food, the whole kit, old wave removed, a fresh wave of zombies. */
+    /** F9: back to the start. Morning, full health and food, the whole kit, hostiles cleared, a fresh wave of zombies. */
     public static void reset(ServerPlayer player) {
         player.setHealth(player.getMaxHealth());
         player.getFoodData().setFoodLevel(20);
@@ -128,9 +131,14 @@ public class HL2Craft implements ModInitializer {
         player.clearFire();
         giveKit(player);
         ServerLevel level = player.level();
+        // A clean arena: morning (so you can see them coming), last wave gone, and no stray creepers or
+        // skeletons within 48 blocks. Runs the vanilla command as the server; the demo world itself has no cheats.
+        level.getServer().getCommands().performPrefixedCommand(
+                level.getServer().createCommandSourceStack().withSuppressedOutput(), "time set day");
         List<Entity> old = new ArrayList<>();
         for (Entity e : level.getAllEntities()) {
-            if (e.entityTags().contains(WAVE_TAG)) {
+            boolean strayHostile = e instanceof Enemy && e.distanceToSqr(player) < 48 * 48;
+            if (e.entityTags().contains(WAVE_TAG) || strayHostile) {
                 old.add(e);
             }
         }
@@ -138,10 +146,16 @@ public class HL2Craft implements ModInitializer {
         GRENADES.forEach(g -> g.entity().discard());
         GRENADES.clear();
         spawnWave(player);
+        if (java.nio.file.Files.exists(java.nio.file.Path.of(System.getProperty("user.home"), ".hl2craft-showcase"))) {
+            // Recording a showcase with scripted (bad) aim: an HEV-suit-like buff so the clip shows the guns,
+            // not the death screen. Only when this marker file exists; normal play is unchanged.
+            player.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 20 * 120, 3, false, false), null);
+            player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 20 * 120, 2, false, false), null);
+        }
         player.sendOverlayMessage(Component.literal("HL2Craft reset: " + WAVE_SIZE + " zombies incoming"));
     }
 
-    /** 15 zombies in a ring 14-24 blocks out. Fire resistance so daylight doesn't kill them before you do. */
+    /** 15 zombies in a ring 14-24 blocks out, capped so daylight doesn't burn them before you get to. */
     public static void spawnWave(ServerPlayer player) {
         ServerLevel level = player.level();
         for (int i = 0; i < WAVE_SIZE; i++) {
@@ -157,7 +171,10 @@ public class HL2Craft implements ModInitializer {
             z.setPos(x + 0.5, y, zc + 0.5);
             z.setPersistenceRequired();
             z.addTag(WAVE_TAG);
-            z.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, MobEffectInstance.INFINITE_DURATION, 0, false, false), null);
+            // A cap keeps them from burning in daylight (vanilla rule), so they're readable on screen and alive
+            // long enough to shoot. Not dropped on death.
+            z.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
+            z.setDropChance(EquipmentSlot.HEAD, 0.0F);
             z.setTarget(player);
             level.addFreshEntity(z);
         }

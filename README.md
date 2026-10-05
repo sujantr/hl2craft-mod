@@ -18,13 +18,19 @@ Minecraft (Fabric mod) --cfg/hl2craft/hc_N.cfg--> HL2 console (+attack, +reload,
 ## Run
 1. Copy `hl2cfg/hl2craft.cfg` and `hl2cfg/hl2craft_stage.cfg` into `Half-Life 2/hl2/cfg/`.
 2. Start the HL2 Demo with `-windowed -w 1728 -h 972 -novid -condebug +exec hl2craft`. It loads d1_town_01.
-3. `swiftc -O -o capture/hl2capture capture/hl2capture.swift && capture/hl2capture`
+3. `swiftc -O -o capture/hl2capture capture/hl2capture.swift && capture/hl2capture` (captures HL2 1:1, full res)
 4. Put `build/libs/hl2craft-1.0.0.jar` and Fabric API into your Fabric profile's `mods/`. If HL2 isn't in the
    default Sikarugir path, set `hl2_dir` in `config/hl2craft.properties`.
-5. In a single-player world, select the crowbar or 9mm pistol (`/hl2craft` gives both). The first selection
-   stages HL2: weapons, god mode, and the "viewmodel only" render settings.
+5. In a single-player world, draw any HL2 weapon. The first time, HL2 loads d1_town_01 and stages itself
+   (weapons, infinite ammo, god mode, "viewmodel only" rendering); this takes ~10 s.
 
-Controls: left click fires or swings, R reloads. `/hl2craft zombie` spawns a test target that stands still.
+Weapons (all given when you join or respawn, unlimited ammo): crowbar, 9mm pistol, SMG, shotgun, .357,
+grenade, gravity gun. These are the ones the HL2 Demo's data contains.
+
+Controls: left click fires or swings (hold for the SMG), right click is HL2's secondary fire (SMG grenade,
+shotgun double barrel, grenade lob), R reloads. **F9** resets everything: morning, full health, the whole kit,
+hostiles cleared, a wave of 15 zombies, and HL2 back at the start. `/hl2craft zombies` spawns another wave;
+`/hl2craft zombie` spawns one that stands still.
 
 ## Notes
 - Single-player only. HL2 is driven through its offline developer console (`sv_cheats 1` in the demo's own
