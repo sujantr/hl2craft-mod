@@ -1,6 +1,8 @@
 package dev.hl2craft;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.Registry;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -11,6 +13,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.Item;
@@ -59,7 +64,46 @@ public class HL2Craft implements ModInitializer {
         PISTOL = register("pistol", Item::new, new Item.Properties().stacksTo(1).durability(PISTOL_CLIP));
         // HL2 crowbar: 10 damage, 0.4 s per swing -> 4.0 damage, 2.5 swings/s (player base 1 + iron 2 + 1).
         CROWBAR = register("crowbar", Item::new, new Item.Properties().sword(ToolMaterial.IRON, 1.0F, -1.5F));
+        // The demo world has no cheats, so /give is out: /hl2craft hands out the kit.
+        CommandRegistrationCallback.EVENT.register((dispatcher, buildContext, selection) ->
+                dispatcher.register(Commands.literal("hl2craft")
+                        .executes(ctx -> {
+                            giveKit(ctx.getSource().getPlayerOrException());
+                            ctx.getSource().sendSuccess(() -> Component.literal("HL2Craft: crowbar and 9mm pistol"), false);
+                            return 1;
+                        })
+                        // Test target: a zombie standing still 6 blocks ahead, so shots are repeatable.
+                        .then(Commands.literal("zombie").executes(ctx -> {
+                            spawnTarget(ctx.getSource().getPlayerOrException());
+                            return 1;
+                        }))));
         LOG.info("HL2Craft items registered");
+    }
+
+    private static void spawnTarget(ServerPlayer player) {
+        ServerLevel level = player.level();
+        Zombie zombie = EntityTypes.ZOMBIE.create(level, EntitySpawnReason.COMMAND);
+        if (zombie == null) {
+            return;
+        }
+        Vec3 look = player.getLookAngle();
+        Vec3 flat = new Vec3(look.x, 0, look.z).normalize();
+        zombie.setPos(player.getX() + flat.x * 6, player.getY(), player.getZ() + flat.z * 6);
+        zombie.setYRot(player.getYRot() + 180);
+        zombie.setYHeadRot(player.getYRot() + 180);
+        zombie.setNoAi(true);
+        zombie.setPersistenceRequired();
+        level.addFreshEntity(zombie);
+    }
+
+    /** Gives the crowbar and pistol unless the player already has them. */
+    public static void giveKit(ServerPlayer player) {
+        if (!player.getInventory().contains(HL2Craft::isCrowbar)) {
+            player.getInventory().add(new ItemStack(CROWBAR));
+        }
+        if (!player.getInventory().contains(HL2Craft::isPistol)) {
+            player.getInventory().add(new ItemStack(PISTOL));
+        }
     }
 
     public static boolean isPistol(ItemStack stack) {

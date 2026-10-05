@@ -1,6 +1,7 @@
 // hl2capture: stream the Half-Life 2 window into a memory-mapped RGBA file for the HL2Craft Minecraft mod.
 //
-// The HL2 key room is pure green (0,255,0); green becomes transparent, with spill suppression on the edges.
+// HL2 renders the viewmodel over a black clear (r_drawworld 0) with everything else fogged pure green; black and
+// green become transparent, with spill suppression on the edges.
 // File layout (little-endian), two slots so the reader never sees a half-written frame:
 //   0  "HC2F"   4 u32 version=1   8 u32 width   12 u32 height
 //   16 u64 seq  (latest completed frame; slot = seq & 1)   24 u64 unix-ms of that frame
@@ -63,10 +64,15 @@ func keyFrame(_ pb: CVPixelBuffer, into dst: UnsafeMutablePointer<UInt8>) {
             let b = Int(s[x * 4]), g = Int(s[x * 4 + 1]), r = Int(s[x * 4 + 2])
             let m = max(r, b)
             var a = 255
-            if g > m {
-                // how much greener than the other channels: 0 = neutral, 255+ = pure key
-                let k = (g - m) * 2
-                a = max(0, 255 - k)
+            if g > m + 10 {
+                // Green-dominant: fog-green and its blends with the black clear. Gun greys sit within 10 of neutral.
+                a = m < 40 ? 0 : max(0, 255 - (g - m - 10) * 8)
+            }
+            // Black key: with r_drawworld 0 HL2 clears to black. The fullbright viewmodel is never this dark, so
+            // ramp alpha over max channel 6..24; anti-aliased gun edges fade instead of keeping a black halo.
+            let peak = max(m, g)
+            if peak < 24 {
+                a = min(a, max(0, (peak - 6) * 255 / 18))
             }
             d[x * 4] = UInt8(r)
             d[x * 4 + 1] = UInt8(min(g, m + 8))  // spill suppression
@@ -122,6 +128,10 @@ Task {
         let cfg = SCStreamConfiguration()
         cfg.width = width
         cfg.height = height
+        // Windowed HL2 has a title bar: capture only the 16:9 client area at the bottom of the window frame.
+        let fw = win!.frame.width, fh = win!.frame.height
+        let ch = fw * 9 / 16
+        cfg.sourceRect = CGRect(x: 0, y: max(0, fh - ch), width: fw, height: ch)
         cfg.pixelFormat = kCVPixelFormatType_32BGRA
         cfg.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         cfg.showsCursor = false

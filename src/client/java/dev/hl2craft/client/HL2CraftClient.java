@@ -46,6 +46,7 @@ public class HL2CraftClient implements ClientModInitializer {
     private static Held lastHeld = Held.NONE;
     private static boolean attackWasDown;
     private static boolean joined;
+    private static boolean staged;
 
     @Override
     public void onInitializeClient() {
@@ -94,12 +95,17 @@ public class HL2CraftClient implements ClientModInitializer {
         }
         if (!joined) {
             joined = true;
-            // Fresh HL2 state for this session: the key room re-equips the weapons and full ammo.
-            bridge.send("map hl2craft_key");
+            staged = false;
             lastHeld = Held.NONE;
+            onServer(client, sp -> { HL2Craft.giveKit(sp); return false; }, () -> { });
         }
         Held now = held(client.player.getMainHandItem());
         if (now != lastHeld) {
+            if (now != Held.NONE && !staged) {
+                // Weapons, ammo and the "viewmodel only" render settings (hl2cfg/hl2craft_stage.cfg).
+                bridge.send("hc_stage");  // runs the stage once per HL2 launch (hl2cfg/hl2craft.cfg)
+                staged = true;
+            }
             if (now == Held.PISTOL) bridge.send("use weapon_pistol");
             if (now == Held.CROWBAR) bridge.send("use weapon_crowbar");
             lastHeld = now;
@@ -107,20 +113,20 @@ public class HL2CraftClient implements ClientModInitializer {
         boolean attackDown = client.options.keyAttack.isDown();
         if (now == Held.PISTOL && client.gui.screen() == null) {
             while (client.options.keyAttack.consumeClick()) {
-                onServer(client, sp -> HL2Craft.firePistol(sp), "+attack\nwait 4\n-attack");
+                onServer(client, sp -> HL2Craft.firePistol(sp), () -> bridge.tap("attack", 80));
             }
             client.options.keyAttack.setDown(false);  // no hold-to-mine with a gun out
             while (reloadKey.consumeClick()) {
-                onServer(client, sp -> HL2Craft.reloadPistol(sp), "+reload\nwait 4\n-reload");
+                onServer(client, sp -> HL2Craft.reloadPistol(sp), () -> bridge.tap("reload", 80));
             }
         } else if (now == Held.CROWBAR && attackDown && !attackWasDown && client.gui.screen() == null) {
-            bridge.send("+attack\nwait 4\n-attack");  // vanilla still does the hit; HL2 swings and sounds
+            bridge.tap("attack", 80);  // vanilla still does the hit; HL2 swings and sounds
         }
         attackWasDown = attackDown;
     }
 
     /** Run the action on the integrated server; if it succeeds, mirror it in HL2. */
-    private static void onServer(Minecraft client, java.util.function.Predicate<ServerPlayer> action, String hl2Commands) {
+    private static void onServer(Minecraft client, java.util.function.Predicate<ServerPlayer> action, Runnable inHl2) {
         IntegratedServer server = client.getSingleplayerServer();
         if (server == null) {
             client.player.sendOverlayMessage(Component.literal("HL2Craft weapons work in single-player only"));
@@ -130,7 +136,7 @@ public class HL2CraftClient implements ClientModInitializer {
         server.execute(() -> {
             ServerPlayer sp = server.getPlayerList().getPlayer(id);
             if (sp != null && action.test(sp)) {
-                bridge.send(hl2Commands);
+                inHl2.run();
             }
         });
     }

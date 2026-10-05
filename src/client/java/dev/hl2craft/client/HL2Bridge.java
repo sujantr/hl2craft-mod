@@ -49,6 +49,24 @@ public final class HL2Bridge {
         });
     }
 
+    /**
+     * Press and release a +/- button (e.g. "attack"). The release goes in a separate file: "wait" inside an exec'd
+     * cfg does not hold a button in this HL2 build, so "+attack; wait 4; -attack" pressed and released in one frame.
+     */
+    public void tap(String button, int holdMillis) {
+        io.execute(() -> {
+            try {
+                write("+" + button);
+                Thread.sleep(holdMillis);
+                write("-" + button);
+            } catch (IOException e) {
+                HL2Craft.LOG.warn("HL2 bridge write failed: {}", e.toString());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+    }
+
     private void write(String commands) throws IOException {
         Files.createDirectories(cfgDir);
         int expected = expectedNext();

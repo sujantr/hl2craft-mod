@@ -54,3 +54,33 @@
   ~/.universal-modder/backups/minecraft-launcher-profiles-before-hl2craft/.
 - NEXT: user runs tools/compile_keyroom.sh, launches HL2 (+exec hl2craft) -> verify `map hl2craft_key` via bridge
   keeps the poll loop alive across map load; then run hl2capture + MC profile and test the slice.
+
+## 2026-10-05 evening: slice WORKING in the real games
+- Wine from the agent shell: exit 136 = SIGFPE in ntdll (crash report). Cause: client sync mode must match the
+  wrapper's running wineserver -> WINEESYNC=1 WINEMSYNC=1 (from Info.plist). Helper ~/.local/bin/hl2wine (user
+  allowed it via a Claude Code permission rule). The map tools and HL2 launch work through it.
+- HL2 DEMO MAP WHITELIST: `map hl2craft_key` -> "map load failed: hl2craft_key not found or invalid" although
+  the BSP is valid v20 and visible to `maps *`. The binaries carry a list of demo maps (d1_trainstation_01/02,
+  d1_town_01/01a/02/03, background0x, ...). Not bypassed (no renaming over a demo map). The key-room tools stay
+  for full-HL2 owners.
+- Green screen inside a demo map (hl2cfg/hl2craft_stage.cfg, d1_town_01): fog_override + green fog makes
+  everything left pure green; r_drawworld/staticprops/disp/brushmodels/detailprops/ropes/particles 0 leaves a
+  black clear; mat_fullbright 1 lights the viewmodel; r_3dsky 0 + r_drawskybox 0. Viewmodel is NOT fogged.
+  r_drawothermodels 0 also hides the viewmodel (don't). hl2capture keys black (max channel <24, soft) AND
+  green (g > max(r,b)+10; dark green-black blends fully transparent).
+- `wait` inside an exec'd cfg does NOT hold a button: "+attack; wait 4; -attack" = press+release in one frame,
+  so no shot (getpos proved yaw unchanged with "+left; wait 60; -left", changed when split across files).
+  HL2Bridge.tap() writes +x and -x as separate files ~80 ms apart. HL2 takes console input while unfocused.
+- god/notarget are toggles: stage runs via alias hc_stage which replaces itself (once per HL2 launch).
+- Measuring the viewmodel: whole-frame mean diffs hide a shot (gun is ~3% of the frame); crop the gun region.
+  HL2 delivers ~20 new frames/s while behind Minecraft (SCK reports ~58 callbacks/s incl. repeats).
+- Minecraft: demo account plays modded installations from the launcher's Installations tab (demo mode).
+  Extra Play clicks launched duplicate instances (closed by PID); the launcher then shows a crash report
+  (dismissed with "Do not share"). Demo world has no cheats -> /hl2craft gives the kit, /hl2craft zombie spawns
+  a still target 6 blocks ahead.
+- VERIFIED (screenshots): HL2 pistol and crowbar viewmodels drawn over Minecraft; left click fires (MC clip
+  18->14, HL2 recoil anim in capture); 4 headshots kill the test zombie ("Monster Hunter" advancement); R plays
+  HL2's reload animation and refills; slot switch swaps HL2 to the crowbar.
+- Latency click->recoil on screen ~0.4 s (HL2 ~20 fps in background, bridge poll ~100 ms). NEXT: cut latency
+  (HL2 background fps, App Nap), viewmodel sway from MC mouse look, crowbar swing timing, HL2 HUD icons, more
+  weapons (SMG1, shotgun, .357 exist in the demo? check weapon scripts), showcase clip.

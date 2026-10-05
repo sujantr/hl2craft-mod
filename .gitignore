@@ -41,3 +41,7 @@ replay_*.log
 *.jfr
 mc-profile/
 capture/hl2capture
+tools/mac/click
+tools/mac/key
+tools/mac/activate
+tools/mac/type
