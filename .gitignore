@@ -49,3 +49,6 @@ tools/mac/wins
 tools/mac/record
 media/
 tools/mac/hold2
+
+# python
+__pycache__/
