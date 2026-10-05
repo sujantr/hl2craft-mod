@@ -34,6 +34,15 @@ public final class HL2Frame {
 
     /** Uploads the newest frame if there is one. Returns true when a recent frame is ready to draw. */
     public boolean update(Minecraft client) {
+        if (map != null && (map.getInt(8) != width || map.getInt(12) != height)) {
+            // hl2capture restarted at another resolution: remap and rebuild the texture.
+            map = null;
+            if (texture != null) {
+                client.getTextureManager().release(TEXTURE);
+                texture = null;
+            }
+            lastSeq = -1;
+        }
         if (map == null && !open()) {
             return false;
         }

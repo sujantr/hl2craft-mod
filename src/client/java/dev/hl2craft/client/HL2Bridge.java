@@ -23,7 +23,10 @@ import java.util.regex.Pattern;
 public final class HL2Bridge {
     private static final Pattern WAITING = Pattern.compile("'hl2craft/hc_(\\d+)' not present");
     private static final Pattern ACK = Pattern.compile("HL2CRAFT ack (\\d+)");
+    /** -Dhl2craft.trace=true logs every command with a millisecond timestamp (latency measurements). */
+    static final boolean TRACE = Boolean.getBoolean("hl2craft.trace") || Files.exists(Path.of(System.getProperty("user.home"), ".hl2craft-trace"));
     private static final String LOADED = "HL2CRAFT bridge loaded";
+    private static final Pattern SPAWNED = Pattern.compile("\nsetpos (?!0\\.000000 0\\.000000 0\\.000000)");
 
     private final Path cfgDir;
     private final Path consoleLog;
@@ -37,6 +40,17 @@ public final class HL2Bridge {
     public HL2Bridge(Path hl2GameDir) {
         this.cfgDir = hl2GameDir.resolve("cfg").resolve("hl2craft");
         this.consoleLog = hl2GameDir.resolve("console.log");
+    }
+
+    private final java.util.concurrent.ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "hl2craft-bridge-timer");
+        t.setDaemon(true);
+        return t;
+    });
+
+    /** Send later without holding up the IO thread (e.g. re-select the frag after HL2 auto-switches away). */
+    public void sendLater(String commands, long delayMillis) {
+        timer.schedule(() -> send(commands), delayMillis, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     public void send(String commands) {
@@ -67,6 +81,37 @@ public final class HL2Bridge {
         });
     }
 
+    /**
+     * F9: reload HL2's map (fresh player, weapons and ammo), wait until the player exists again, then re-stage.
+     * Commands queued behind "map" can run before the player spawns, so this polls getpos (it prints a "setpos"
+     * line only once there is a player) instead of trusting "wait".
+     */
+    public void resetAndStage(java.util.function.Supplier<String> afterStage) {
+        io.execute(() -> {
+            try {
+                String marker = "HL2CRAFT reset " + System.nanoTime();
+                write("hc_arm\necho \"" + marker + "\"\nmap d1_town_01");
+                long deadline = System.currentTimeMillis() + 60_000;
+                while (System.currentTimeMillis() < deadline) {
+                    Thread.sleep(700);
+                    write("getpos");
+                    Thread.sleep(300);
+                    String tail = tail(256 * 1024);
+                    int at = tail.lastIndexOf(marker);
+                    // getpos prints "setpos 0.000000 0.000000 0.000000" while the map is still loading.
+                    if (at >= 0 && SPAWNED.matcher(tail.substring(at)).find()) {
+                        break;
+                    }
+                }
+                write("hc_stage\n" + afterStage.get());
+            } catch (IOException e) {
+                HL2Craft.LOG.warn("HL2 reset failed: {}", e.toString());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+    }
+
     private void write(String commands) throws IOException {
         Files.createDirectories(cfgDir);
         int expected = expectedNext();
@@ -81,6 +126,9 @@ public final class HL2Bridge {
         Path tmp = cfgDir.resolve(".hc_" + n + ".tmp");
         Files.writeString(tmp, body, StandardCharsets.US_ASCII);
         Files.move(tmp, file(n), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        if (TRACE) {
+            HL2Craft.LOG.info("hl2 bridge t={} hc_{}: {}", System.currentTimeMillis(), n, commands.replace('\n', ';'));
+        }
         Files.deleteIfExists(file(n - 4));
     }
 

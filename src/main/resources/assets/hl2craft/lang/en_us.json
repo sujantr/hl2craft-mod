@@ -1,6 +1,12 @@
 {
-  "item.hl2craft.pistol": "9mm Pistol",
   "item.hl2craft.crowbar": "Crowbar",
+  "item.hl2craft.pistol": "9mm Pistol",
+  "item.hl2craft.smg": "SMG",
+  "item.hl2craft.shotgun": "Shotgun",
+  "item.hl2craft.magnum": ".357 Magnum",
+  "item.hl2craft.grenade": "Grenade",
+  "item.hl2craft.gravity_gun": "Zero Point Energy Field Manipulator",
   "key.hl2craft.reload": "Reload (HL2 weapons)",
+  "key.hl2craft.reset": "Reset HL2Craft (weapons, zombies, HL2)",
   "key.category.hl2craft.controls": "HL2Craft"
 }

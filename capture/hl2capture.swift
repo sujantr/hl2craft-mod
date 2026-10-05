@@ -8,7 +8,9 @@
 //   32 slot0 RGBA (w*h*4)   32+w*h*4 slot1 RGBA
 //
 // build: swiftc -O -o hl2capture hl2capture.swift
-// run:   ./hl2capture [--width 960] [--height 540] [--out ~/Library/Caches/hl2craft/frame.rgba]
+// run:   ./hl2capture [--width W --height H] [--out ~/Library/Caches/hl2craft/frame.rgba]
+//        Default size = HL2's client area 1:1 (full resolution). The file only ever grows: Minecraft keeps it
+//        mapped, and shrinking a mapped file under a reader crashes it (SIGBUS); the reader remaps on a new size.
 import AppKit
 import CoreMedia
 import CoreVideo
@@ -19,7 +21,7 @@ import ScreenCaptureKit
 NSApplication.shared.setActivationPolicy(.prohibited)
 setvbuf(stdout, nil, _IOLBF, 0)
 
-var width = 960, height = 540
+var width = 0, height = 0  // 0 = follow the HL2 window
 var outPath = NSString(string: "~/Library/Caches/hl2craft/frame.rgba").expandingTildeInPath
 var args = CommandLine.arguments.dropFirst().makeIterator()
 while let a = args.next() {
@@ -32,23 +34,33 @@ while let a = args.next() {
 }
 
 let header = 32
-let slotSize = width * height * 4
-let fileSize = header + 2 * slotSize
-try FileManager.default.createDirectory(atPath: (outPath as NSString).deletingLastPathComponent,
-                                        withIntermediateDirectories: true)
-let fd = open(outPath, O_RDWR | O_CREAT, 0o644)
-guard fd >= 0, ftruncate(fd, off_t(fileSize)) == 0 else { print("cannot open \(outPath)"); exit(1) }
-guard let map = mmap(nil, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), map != MAP_FAILED else {
-    print("mmap failed"); exit(1)
-}
-let base = map.assumingMemoryBound(to: UInt8.self)
-memcpy(base, "HC2F", 4)
-base.advanced(by: 4).withMemoryRebound(to: UInt32.self, capacity: 3) { p in
-    p[0] = 1; p[1] = UInt32(width); p[2] = UInt32(height)
-}
-let seqPtr = UnsafeMutableRawPointer(base.advanced(by: 16)).assumingMemoryBound(to: UInt64.self)
-let timePtr = UnsafeMutableRawPointer(base.advanced(by: 24)).assumingMemoryBound(to: UInt64.self)
+var slotSize = 0
+var base: UnsafeMutablePointer<UInt8>!
+var seqPtr: UnsafeMutablePointer<UInt64>!
+var timePtr: UnsafeMutablePointer<UInt64>!
 var seq: UInt64 = 0
+
+func openOutput() {
+    slotSize = width * height * 4
+    let fileSize = header + 2 * slotSize
+    try? FileManager.default.createDirectory(atPath: (outPath as NSString).deletingLastPathComponent,
+                                             withIntermediateDirectories: true)
+    let fd = open(outPath, O_RDWR | O_CREAT, 0o644)
+    var st = stat()
+    guard fd >= 0, fstat(fd, &st) == 0 else { print("cannot open \(outPath)"); exit(1) }
+    if Int(st.st_size) < fileSize && ftruncate(fd, off_t(fileSize)) != 0 { print("cannot grow \(outPath)"); exit(1) }
+    guard let map = mmap(nil, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0), map != MAP_FAILED else {
+        print("mmap failed"); exit(1)
+    }
+    base = map.assumingMemoryBound(to: UInt8.self)
+    seqPtr = UnsafeMutableRawPointer(base.advanced(by: 16)).assumingMemoryBound(to: UInt64.self)
+    timePtr = UnsafeMutableRawPointer(base.advanced(by: 24)).assumingMemoryBound(to: UInt64.self)
+    seq = seqPtr.pointee
+    memcpy(base, "HC2F", 4)
+    base.advanced(by: 4).withMemoryRebound(to: UInt32.self, capacity: 3) { p in
+        p[0] = 1; p[1] = UInt32(width); p[2] = UInt32(height)
+    }
+}
 
 /// BGRA (capture) -> RGBA with chroma key. Green-dominant pixels go transparent; edges lose their green spill.
 func keyFrame(_ pb: CVPixelBuffer, into dst: UnsafeMutablePointer<UInt8>) {
@@ -87,6 +99,12 @@ final class Output: NSObject, SCStreamOutput, SCStreamDelegate {
     var last = Date()
     func stream(_ stream: SCStream, didOutputSampleBuffer sb: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen, sb.isValid, let pb = sb.imageBuffer else { return }
+        // Only frames with new content: SCK also delivers repeats while HL2 hasn't drawn, which made the log's
+        // fps look like 58 when HL2 actually drew ~20 behind Minecraft.
+        if let info = (CMSampleBufferGetSampleAttachmentsArray(sb, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]])?.first,
+           let raw = info[.status] as? Int, SCFrameStatus(rawValue: raw) != .complete {
+            return
+        }
         let next = seq + 1
         keyFrame(pb, into: base.advanced(by: header + Int(next & 1) * slotSize))
         OSMemoryBarrier()
@@ -125,12 +143,14 @@ Task {
             try await Task.sleep(nanoseconds: 2_000_000_000)
             win = try await findWindow()
         }
-        let cfg = SCStreamConfiguration()
-        cfg.width = width
-        cfg.height = height
         // Windowed HL2 has a title bar: capture only the 16:9 client area at the bottom of the window frame.
         let fw = win!.frame.width, fh = win!.frame.height
         let ch = fw * 9 / 16
+        if width == 0 { width = Int(fw); height = Int(ch.rounded()) }
+        openOutput()
+        let cfg = SCStreamConfiguration()
+        cfg.width = width
+        cfg.height = height
         cfg.sourceRect = CGRect(x: 0, y: max(0, fh - ch), width: fw, height: ch)
         cfg.pixelFormat = kCVPixelFormatType_32BGRA
         cfg.minimumFrameInterval = CMTime(value: 1, timescale: 60)

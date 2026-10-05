@@ -1,1 +1,1 @@
-{ "parent": "minecraft:item/handheld", "textures": { "layer0": "hl2craft:item/pistol" } }
+{"parent": "minecraft:item/handheld", "textures": {"layer0": "hl2craft:item/pistol"}}

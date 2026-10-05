@@ -3,8 +3,19 @@
     "type": "minecraft:select",
     "property": "minecraft:display_context",
     "cases": [
-      { "when": ["firstperson_righthand", "firstperson_lefthand"], "model": { "type": "minecraft:empty" } }
+      {
+        "when": [
+          "firstperson_righthand",
+          "firstperson_lefthand"
+        ],
+        "model": {
+          "type": "minecraft:empty"
+        }
+      }
     ],
-    "fallback": { "type": "minecraft:model", "model": "hl2craft:item/crowbar" }
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "hl2craft:item/crowbar"
+    }
   }
 }

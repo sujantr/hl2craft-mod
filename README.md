@@ -17,7 +17,7 @@ Minecraft (Fabric mod) --cfg/hl2craft/hc_N.cfg--> HL2 console (+attack, +reload,
 
 ## Run
 1. Copy `hl2cfg/hl2craft.cfg` and `hl2cfg/hl2craft_stage.cfg` into `Half-Life 2/hl2/cfg/`.
-2. Start the HL2 Demo with `-windowed -w 1280 -h 720 -novid -condebug +exec hl2craft`. It loads d1_town_01.
+2. Start the HL2 Demo with `-windowed -w 1728 -h 972 -novid -condebug +exec hl2craft`. It loads d1_town_01.
 3. `swiftc -O -o capture/hl2capture capture/hl2capture.swift && capture/hl2capture`
 4. Put `build/libs/hl2craft-1.0.0.jar` and Fabric API into your Fabric profile's `mods/`. If HL2 isn't in the
    default Sikarugir path, set `hl2_dir` in `config/hl2craft.properties`.

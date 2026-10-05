@@ -1,1 +1,1 @@
-{ "parent": "minecraft:item/handheld", "textures": { "layer0": "hl2craft:item/crowbar" } }
+{"parent": "minecraft:item/handheld", "textures": {"layer0": "hl2craft:item/crowbar"}}
