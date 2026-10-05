@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "hl2craft",
+	"version": "${version}",
+	"name": "HL2Craft",
+	"description": "Half-Life 2 weapons in Minecraft: a live HL2 (your own install) renders and sounds the gun, Minecraft does the hits.",
+	"license": "CC0-1.0",
+	"environment": "*",
+	"entrypoints": {
+		"main": ["dev.hl2craft.HL2Craft"],
+		"client": ["dev.hl2craft.client.HL2CraftClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}
